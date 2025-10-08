@@ -1,0 +1,877 @@
+{
+  "name": "Google Maps Scraper - AI Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "2f0f5208-3261-4e56-af80-342bef5ad0bd",
+      "name": "When chat message received",
+      "webhookId": "e2cbf8ea-c160-4611-a14d-e0ea766b70cc"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=User's Input: {{ $json.chatInput }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=You are an agent that guides the user through giving scraping instructions step by step, builds a valid Apify JSON payload, and then calls the Scrape Data tool with that JSON. The tool will return a file ID. You must generate the Google Sheet URL from that ID and send it back to the user. Keep it short, practical, and natural like a focused conversation, not a form.\n\nConversation rules\n1. Ask only one question at a time. Wait for the user reply before moving forward.\n2. Start with three core inputs in this order:\n   a) Search term or place (e.g., \"restaurants\" or a specific Google Place ID). If user gives a general term accept it as is.\n   b) Location (city and country).\n   c) Number of results per search term (integer).\n3. After the core three, ask if they want optional filters. Mention a short list: language, rating, website-only, max reviews, scrape contacts, reviews personal data, leads enrichment.\n4. Validate inputs lightly. If a format or type is invalid, ask one clear corrective question only.\n5. Keep tone direct, confident, and businesslike. No jargon, no repetition, no robotic loops.\n6. Once inputs are collected, generate the JSON payload exactly matching the Apify input schema and show that JSON to the user.\n7. If the user requested any personal data extraction options (reviews personal data, leads enrichment, scrape contacts, etc.) pause and request explicit yes to proceed. Warn about GDPR and local law risks. Do not proceed without explicit yes for those options.\n8. After showing JSON and handling any required confirmation, pass the generated JSON to the Scrape Data tool.\n9. The tool will return a file ID. Construct the sheet URL in this format:\n   https://docs.google.com/spreadsheets/d/[insertid]/edit?gid=0#gid=0\n   Replace [insertid] with the returned file ID.\n10. Send the URL back to the user along with a one-line status.\n11. If the tool returns empty, inform the user and offer retry or parameter adjustment.\n12. End the conversation once results are delivered.\n\nTone\n- Conversational, confident, outcome-focused.\n- Never sound like a form.\n- Guide the user like a smart assistant, not a script.\n\nAvailable tool:\n- Scrape Data: Takes the generated JSON payload as input and returns a file ID.\n\nReference - Parameter definitions and key notes\n- searchStringsArray (array) - Terms you would type into Google Maps. Use unique terms for faster processing. Can include place IDs in format place_id:ChIJ... Note: Adding a location inside the search string can limit results to ~120 due to scrolling.\n- locationQuery (string) - Free text location. City + Country recommended. City polygons may be smaller than expected. Use customGeolocation for precise areas.\n- maxCrawledPlacesPerSearch (integer) - Number of results per search term. Leave empty to try to scrape all visible places.\n- language (enum) - Results language. Default \"en\".\n- categoryFilterWords (array) - Category filters. Using categories can cause false negatives. Include synonyms.\n- searchMatching (enum) - \"all\", \"only_includes\", \"only_exact\". Default \"all\".\n- placeMinimumStars (enum) - Minimum star rating filter. Empty by default.\n- website (enum) - \"allPlaces\", \"withWebsite\", \"withoutWebsite\". Default \"allPlaces\".\n- skipClosedPlaces (boolean) - Skip temporary or permanently closed places. Default false.\n- scrapePlaceDetailPage (boolean) - If true, actor opens each place detail page. Required for many detail options. Default false.\n- scrapeTableReservationProvider (boolean) - Scrape table reservation provider data for restaurants. Default false.\n- includeWebResults (boolean) - Extract \"Web results\" shown on place pages. Default false.\n- scrapeDirectories (boolean) - Scrape businesses inside malls or directories. Requires scrapePlaceDetailPage. Default false.\n- maxQuestions (integer) - Number of Q&A to extract per place. 0 or empty yields first Q&A only. Use 999 to extract all.\n- scrapeContacts (boolean) - Enrich places with contact details from website. Excludes major chains. Default false.\n- maximumLeadsEnrichmentRecords (integer) - Max leads per place when leads enrichment is enabled. Default 0. This can include personal data.\n- leadsEnrichmentDepartments (array) - Filter leads by department. Only works if maximumLeadsEnrichmentRecords > 0.\n- maxReviews (integer) - Number of reviews to extract. Empty to extract all. Extracting reviews triggers extra place detail events and extra charges.\n- reviewsStartDate (string) - Absolute date (YYYY-MM-DD) or relative (e.g., \"3 months\"). If set, must use reviewsSort = \"newest\".\n- reviewsSort (enum) - \"newest\", \"mostRelevant\", \"highestRanking\", \"lowestRanking\". Default \"newest\".\n- reviewsFilterString (string) - Keywords to filter reviews by.\n- reviewsOrigin (enum) - \"all\" or \"google\". Default \"all\".\n- scrapeReviewsPersonalData (boolean) - Include reviewer personal data. Default true. Warn on GDPR risks.\n- maxImages (integer) - Number of images per place. Empty for all. Extracting images adds cost and time.\n- scrapeImageAuthors (boolean) - Include image author names. May slow processing.\n- countryCode (enum) - Two letter country code to scope the search.\n- city, state, county, postalCode (strings) - Additional geolocation fields. Do not combine postalCode with city. Postal code must be used with countryCode.\n- customGeolocation (object) - Polygon coordinate object for precise areas. Coordinates order: [longitude, latitude].\n- startUrls (array) - Google Maps URLs to scrape. Max 300 results per URL.\n- placeIds (array) - Direct place IDs list.\n- allPlacesNoSearchAction (enum) - \"all_places_no_search_ocr\" or \"all_places_no_search_mouse\" to extract all visible pins on the map.\n\n\nWarnings and practical tips\n- If user asks for personal data extraction enable explicit confirmation and remind them about GDPR and local laws.\n- Using many optional filters reduces hits and increases cost and runtime.\n- Scraping place detail pages, reviews, images, or contacts will slow the actor and may increase cost.\n- For wide city coverage consider customGeolocation or using multiple runs with different polygons.\n- If reviewsStartDate is used set reviewsSort to \"newest\" to ensure correct behavior."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        208,
+        0
+      ],
+      "id": "d638cc1e-8c9e-47c3-b323-e81a174ef949",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        80,
+        208
+      ],
+      "id": "b8ccbfbf-1b6e-4ede-9a43-b201eea56b50",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "vqV0F7lJgajCMsYW",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        208
+      ],
+      "id": "db5a03e1-da2d-4500-8b93-75a22d1af45f",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "description": "Call this to scrape Google Maps and generate a spreadsheet using the results. The input in going to be JSON payload.",
+        "workflowId": {
+          "__rl": true,
+          "value": "Zhdwb0T91lMvbaUe",
+          "mode": "list",
+          "cachedResultName": "Google Maps Scraper - AI Agent"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "json_payload": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('json_payload', ``, 'string') }}"
+          },
+          "matchingColumns": [
+            "json_payload"
+          ],
+          "schema": [
+            {
+              "id": "json_payload",
+              "displayName": "json_payload",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        368,
+        208
+      ],
+      "id": "012a1bdb-2cb5-4295-840f-2b9462ff3cbe",
+      "name": "Scrape Data"
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "json_payload"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        656,
+        48
+      ],
+      "id": "9beeb312-4e7d-4c5b-9ec1-4fab274e6af3",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "operation": "copy",
+        "fileId": {
+          "__rl": true,
+          "value": "1AweMLECQe6nJxrHiduZSwPOYtAid2kwjCioS7ITYyDc",
+          "mode": "list",
+          "cachedResultName": "Template: Scraped Data",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1AweMLECQe6nJxrHiduZSwPOYtAid2kwjCioS7ITYyDc/edit?usp=drivesdk"
+        },
+        "name": "Scraped Data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        864,
+        48
+      ],
+      "id": "306289e5-d659-41b3-970c-c045ddc07923",
+      "name": "Copy file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "87PxU1ixlQ1S5p6P",
+          "name": "Google Drive account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "Run actor and get dataset",
+        "actorId": {
+          "__rl": true,
+          "value": "nwua9Gu5YrADL7ZDj",
+          "mode": "list",
+          "cachedResultName": "Google Maps Scraper (compass/crawler-google-places)",
+          "cachedResultUrl": "https://console.apify.com/actors/nwua9Gu5YrADL7ZDj/input"
+        },
+        "customBody": "={{ $('When Executed by Another Workflow').item.json.json_payload }}"
+      },
+      "type": "@apify/n8n-nodes-apify.apify",
+      "typeVersion": 1,
+      "position": [
+        1072,
+        48
+      ],
+      "id": "bf1e3ef0-d4d5-4719-90ea-9f41ffb834c9",
+      "name": "Run an Actor and get dataset",
+      "credentials": {
+        "apifyApi": {
+          "id": "jBdiwjMldZ908vSb",
+          "name": "Apify account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Copy file').item.json.id }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "title": "={{ $json.title }}",
+            "price": "={{ $json.price }}",
+            "categoryName": "={{ $json.categoryName }}",
+            "address": "={{ $json.address }}",
+            "neighborhood": "={{ $json.neighborhood }}",
+            "street": "={{ $json.street }}",
+            "city": "={{ $json.city }}",
+            "postalCode": "={{ $json.postalCode }}",
+            "state": "={{ $json.state }}",
+            "countryCode": "={{ $json.countryCode }}",
+            "phone": "={{ $json.phone }}",
+            "phoneUnformatted": "={{ $json.phoneUnformatted }}",
+            "claimThisBusiness": "={{ $json.claimThisBusiness }}",
+            "lat": "={{ $json.location.lat }}",
+            "lng": "={{ $json.location.lng }}",
+            "totalScore": "={{ $json.totalScore }}",
+            "permanentlyClosed": "={{ $json.permanentlyClosed }}",
+            "temporarilyClosed": "={{ $json.temporarilyClosed }}",
+            "placeId": "={{ $json.placeId }}",
+            "categories": "={{ $json.categories }}",
+            "fid": "={{ $json.fid }}",
+            "cid": "={{ $json.cid }}",
+            "reviewsCount": "={{ $json.reviewsCount }}",
+            "imagesCount": "={{ $json.imagesCount }}",
+            "imageCategories": "={{ $json.imageCategories }}",
+            "scrapedAt": "={{ $json.scrapedAt }}",
+            "googleFoodUrl": "={{ $json.googleFoodUrl }}",
+            "hotelAds": "={{ $json.hotelAds }}",
+            "openingHours": "={{ $json.openingHours }}",
+            "peopleAlsoSearch": "={{ $json.peopleAlsoSearch }}",
+            "placesTags": "={{ $json.placesTags }}",
+            "reviewsTags": "={{ $json.reviewsTags }}",
+            "Service options": "={{ $json.additionalInfo['Service options'] }}",
+            "Highlights": "={{ $json.additionalInfo.Highlights }}",
+            "Popular for": "={{ $json.additionalInfo['Popular for'] }}",
+            "Offerings": "={{ $json.additionalInfo.Offerings }}",
+            "Dining options": "={{ $json.additionalInfo['Dining options'] }}",
+            "Atmosphere": "={{ $json.additionalInfo.Atmosphere }}",
+            "Crowd": "={{ $json.additionalInfo.Crowd }}",
+            "Payments": "={{ $json.additionalInfo.Payments }}",
+            "Children": "={{ $json.additionalInfo.Children }}",
+            "Parking": "={{ $json.additionalInfo.Parking }}",
+            "gasPrices": "={{ $json.gasPrices }}",
+            "url": "={{ $json.url }}",
+            "searchPageUrl": "={{ $json.searchPageUrl }}",
+            "searchString": "={{ $json.searchString }}",
+            "language": "={{ $json.language }}",
+            "rank": "={{ $json.rank }}",
+            "isAdvertisement": "={{ $json.isAdvertisement }}",
+            "imageUrl": "={{ $json.imageUrl }}",
+            "kgmid": "={{ $json.kgmid }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "subTitle",
+              "displayName": "subTitle",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "price",
+              "displayName": "price",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "categoryName",
+              "displayName": "categoryName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "address",
+              "displayName": "address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "neighborhood",
+              "displayName": "neighborhood",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "street",
+              "displayName": "street",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "city",
+              "displayName": "city",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "postalCode",
+              "displayName": "postalCode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "countryCode",
+              "displayName": "countryCode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phoneUnformatted",
+              "displayName": "phoneUnformatted",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "claimThisBusiness",
+              "displayName": "claimThisBusiness",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "lat",
+              "displayName": "lat",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "lng",
+              "displayName": "lng",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "totalScore",
+              "displayName": "totalScore",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "permanentlyClosed",
+              "displayName": "permanentlyClosed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "temporarilyClosed",
+              "displayName": "temporarilyClosed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "placeId",
+              "displayName": "placeId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "categories",
+              "displayName": "categories",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fid",
+              "displayName": "fid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cid",
+              "displayName": "cid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reviewsCount",
+              "displayName": "reviewsCount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "imagesCount",
+              "displayName": "imagesCount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "imageCategories",
+              "displayName": "imageCategories",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "scrapedAt",
+              "displayName": "scrapedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "googleFoodUrl",
+              "displayName": "googleFoodUrl",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hotelAds",
+              "displayName": "hotelAds",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "openingHours",
+              "displayName": "openingHours",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "peopleAlsoSearch",
+              "displayName": "peopleAlsoSearch",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "placesTags",
+              "displayName": "placesTags",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reviewsTags",
+              "displayName": "reviewsTags",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Service options",
+              "displayName": "Service options",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Highlights",
+              "displayName": "Highlights",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Popular for",
+              "displayName": "Popular for",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Offerings",
+              "displayName": "Offerings",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Dining options",
+              "displayName": "Dining options",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Atmosphere",
+              "displayName": "Atmosphere",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Crowd",
+              "displayName": "Crowd",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Payments",
+              "displayName": "Payments",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Children",
+              "displayName": "Children",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Parking",
+              "displayName": "Parking",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "gasPrices",
+              "displayName": "gasPrices",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "url",
+              "displayName": "url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "searchPageUrl",
+              "displayName": "searchPageUrl",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "searchString",
+              "displayName": "searchString",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "language",
+              "displayName": "language",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "rank",
+              "displayName": "rank",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "isAdvertisement",
+              "displayName": "isAdvertisement",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "imageUrl",
+              "displayName": "imageUrl",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "kgmid",
+              "displayName": "kgmid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        1280,
+        48
+      ],
+      "id": "de5734b0-e8ea-42de-9c63-c564e5827179",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "9ICCSETStHE0XFyY",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "43ffd4e4-6c5c-4d54-9651-0568e4415247",
+              "name": "id",
+              "value": "={{ $('Copy file').item.json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1488,
+        48
+      ],
+      "id": "5044f7a6-bd9c-423c-9fdc-967a5457c892",
+      "name": "Edit Fields"
+    }
+  ],
+  "pinData": {
+    "When Executed by Another Workflow": [
+      {
+        "json": {
+          "json_payload": "{\n    \"searchStringsArray\": [\n        \"restaurant\"\n    ],\n    \"locationQuery\": \"New York, USA\",\n    \"maxCrawledPlacesPerSearch\": 3\n}"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrape Data": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Copy file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Copy file": {
+      "main": [
+        [
+          {
+            "node": "Run an Actor and get dataset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run an Actor and get dataset": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "0563ccf7-9487-499c-8774-5dc34c2c4bd7",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ad49dd1ad62a8abd5335dea04122d3be59a8b19ed44c6013b841467cc2d7c313"
+  },
+  "id": "Zhdwb0T91lMvbaUe",
+  "tags": []
+}
